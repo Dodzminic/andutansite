@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <title>FILSYNC | Sentinel Hub</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        :root { --pink: #ff85a2; --bg: #fdf8f9; --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        [data-bs-theme="dark"] { --bg: #0f1418; --card: #1a2026; }
+        body { background-color: var(--bg); font-family: 'Plus Jakarta Sans', sans-serif; transition: var(--transition); }
+        .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-radius: 30px; border: 1px solid rgba(255,255,255,0.3); transition: var(--transition); }
+        [data-bs-theme="dark"] .glass-card { background: rgba(26, 32, 38, 0.85); border-color: rgba(255,255,255,0.05); color: white; }
+        .btn-pink { background: linear-gradient(45deg, #ff85a2, #ff6b8d); color: white; border-radius: 50px; font-weight: 700; border: none; padding: 12px 25px; transition: 0.4s; position: relative; z-index: 10; }
+        .btn-pink:hover { transform: translateY(-3px) scale(1.05); box-shadow: 0 10px 20px rgba(255, 133, 162, 0.4); color: white; }
+        .btn-pink:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+        .ana-card { background: white; border-radius: 20px; padding: 15px; min-width: 100px; border: 1px solid #f1f3f5; }
+        [data-bs-theme="dark"] .ana-card { background: #1a2026; border-color: #2d3436; }
+        .p-box { width: 45px; height: 45px; border-radius: 12px; object-fit: cover; background: #ffeef2; color: var(--pink); display: flex; align-items: center; justify-content: center; font-weight: 800; }
+        .log-item { font-size: 11px; border-left: 3px solid var(--pink); padding-left: 10px; margin-bottom: 12px; }
+        @keyframes glitch { 0% { opacity: 1; } 90% { opacity: 1; } 92% { opacity: 0.5; transform: translateX(2px); } 94% { opacity: 1; transform: translateX(0); } 96% { opacity: 0.3; } 100% { opacity: 1; } }
+        .command-tagline { font-size: 10px; letter-spacing: 5px; color: var(--pink); text-transform: uppercase; font-weight: 900; animation: glitch 4s infinite; }
+        #preview-img { width: 80px; height: 80px; border-radius: 15px; object-fit: cover; display: none; margin: 10px auto; border: 3px solid white; }
+        .input-error { border: 2px solid #ff5e57 !important; }
+    </style>
+</head>
+<body class="py-4">
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="glass-card p-4 flex-grow-1 d-flex align-items-center me-3 shadow-sm">
+            <div class="me-auto">
+                <h1 class="fw-800 mb-0" style="font-size: 32px; letter-spacing: -2px; line-height: 1;">
+                    FIL<span style="color: var(--pink); text-shadow: 0 0 15px rgba(255, 133, 162, 0.4);">SYNC</span>
+                    <span style="font-size: 12px; letter-spacing: 4px; vertical-align: middle; color: #636e72; font-weight: 900; margin-left: 5px;">SENTINEL</span>
+                </h1>
+                <p class="mb-0 command-tagline">> SYSTEM OVERRIDE. TOTAL IDENTITY CONTROL.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <div class="ana-card shadow-sm text-center">
+                    <div style="font-size: 8px; font-weight: 800; color: var(--pink);">RECORDS</div>
+                    <div class="fw-800">{{ count }}</div>
+                </div>
+                <div class="ana-card shadow-sm text-center">
+                    <div style="font-size: 8px; font-weight: 800; color: #0fbcf9;">MALE</div>
+                    <div class="fw-800 text-info">{{ m_count }}</div>
+                </div>
+                <div class="ana-card shadow-sm text-center">
+                    <div style="font-size: 8px; font-weight: 800; color: #ff5e57;">FEMALE</div>
+                    <div class="fw-800 text-danger">{{ f_count }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex flex-column gap-2">
+            <div class="d-flex gap-3 align-items-center justify-content-end mb-1">
+                <i class="bi bi-moon-stars-fill fs-3 text-pink" style="cursor:pointer" id="themeBtn"></i>
+                <button type="button" class="btn-pink shadow-sm" data-bs-toggle="modal" data-bs-target="#addModal">NEW ENTRY</button>
+            </div>
+            <button class="btn btn-dark rounded-pill fw-800 py-2" style="font-size: 11px;" onclick="location.href='{% url 'export_students' %}'">EXPORT CSV</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3">
+            <div class="glass-card p-4 mb-4 shadow-sm">
+                <h6 class="fw-800 small text-muted mb-3 text-uppercase">Activity Logs</h6>
+                {% for log in logs %}
+                <div class="log-item"><div class="fw-bold">{{ log.action }}</div><div class="text-muted" style="font-size: 9px;">{{ log.timestamp|timesince }} ago</div></div>
+                {% endfor %}
+            </div>
+            <div class="glass-card p-4 mb-4">
+                <h6 class="fw-800 small mb-3 text-muted text-uppercase">Categories</h6>
+                <form action="{% url 'user_list' %}" method="POST" class="mb-4"> {% csrf_token %}
+                    <div class="input-group">
+                        <input type="text" name="gender_name" class="form-control rounded-pill-start border-0 bg-light px-3" placeholder="Add..." required>
+                        <button type="submit" name="add_gender" class="btn btn-dark rounded-pill-end px-3"><i class="bi bi-plus"></i></button>
+                    </div>
+                </form>
+                {% for g in genders %}
+                <div class="d-flex justify-content-between align-items-center p-2 mb-2 bg-light rounded-3 px-3 shadow-sm sidebar-glow">
+                    <span class="small fw-700 text-dark">{{ g.gender }}</span>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'edit_gender' g.id %}" class="btn btn-sm p-0 text-muted"><i class="bi bi-pencil-square"></i></a>
+                        <a href="javascript:void(0)" onclick="confirmAction('{% url 'delete_gender' g.id %}', 'Delete Category?')" class="btn btn-sm p-0 text-danger"><i class="bi bi-trash-fill"></i></a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <a href="{% url 'archive_list' %}" class="btn btn-dark w-100 rounded-4 py-3 fw-800 shadow-sm"><i class="bi bi-shield-lock-fill me-2"></i> OPEN VAULT</a>
+        </div>
+
+        <div class="col-md-9">
+            <form id="bulkForm" method="POST"> {% csrf_token %}
+                <div class="glass-card p-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <input type="text" id="master-smart-search" class="form-control rounded-pill border-0 bg-light p-3 px-4 w-50" placeholder="Type to search global database...">
+                        <button type="submit" name="bulk_archive" class="btn btn-outline-danger rounded-pill fw-800" id="bulkBtn" style="display: none;">ARCHIVE SELECTED</button>
+                    </div>
+
+                    <table class="table table-borderless align-middle">
+                        <thead>
+                            <tr class="small text-muted text-uppercase">
+                                <th width="40"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                                <th>Identity</th>
+                                <th>Email Source</th>
+                                <th class="text-center">Category</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-table-body">
+                            {% for u in users %}
+                            <tr class="user-row hover-row" data-gender="{{ u.gender.gender|lower }}">
+                                <td><input type="checkbox" name="selected_users" value="{{ u.id }}" class="form-check-input user-checkbox"></td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-3">
+                                        {% if u.profile_picture %}<img src="{{ u.profile_picture.url }}" class="p-box">{% else %}<div class="p-box">{{ u.username|slice:":1"|upper }}</div>{% endif %}
+                                        <div class="fw-800">{{ u.username }}</div>
+                                    </div>
+                                </td>
+                                <td class="small opacity-75 fw-600">{{ u.email }}</td>
+                                <td class="text-center"><span class="badge bg-light text-dark border fw-bold text-uppercase" style="font-size: 9px; padding: 5px 12px; border-radius: 50px;">{{ u.gender.gender }}</span></td>
+                                <td class="text-end pe-3">
+                                    <a href="{% url 'edit_user' u.id %}" class="btn btn-sm btn-light rounded-pill me-1"><i class="bi bi-gear-fill"></i></a>
+                                    <button type="button" onclick="confirmAction('{% url 'delete_user' u.id %}', 'Archive Identity?')" class="btn btn-sm btn-light rounded-pill text-danger"><i class="bi bi-archive-fill"></i></button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div id="page-info" class="small fw-800 text-muted"></div>
+                        <div class="d-flex gap-2">
+                            <button type="button" id="prevBtn" class="btn btn-sm btn-light rounded-pill px-3 fw-800">PREV</button>
+                            <button type="button" id="nextBtn" class="btn btn-sm btn-light rounded-pill px-3 fw-800">NEXT</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content p-5 rounded-5 border-0 shadow-lg">
+        <form id="addIdentityForm" action="{% url 'user_list' %}" method="POST" enctype="multipart/form-data"> {% csrf_token %}
+            <h4 class="fw-800 mb-2 text-center text-dark">Register Identity</h4>
+            <div class="text-center"><img id="preview-img" src="#" alt="Preview"></div>
+            <input type="text" name="username" class="form-control rounded-pill bg-light border-0 p-3 mb-3" placeholder="Full Name" required>
+            <input type="email" name="email" class="form-control rounded-pill bg-light border-0 p-3 mb-3" placeholder="Email" required>
+            <select name="gender" class="form-select rounded-pill bg-light border-0 p-3 mb-3 fw-bold" required>
+                <option value="" disabled selected>Category</option>
+                {% for g in genders %}<option value="{{ g.id }}">{{ g.gender }}</option>{% endfor %}
+            </select>
+            <input type="password" id="pass1" name="password" class="form-control rounded-pill bg-light border-0 p-3 mb-3" placeholder="Password" required>
+            <input type="password" id="pass2" name="confirm_password" class="form-control rounded-pill bg-light border-0 p-3 mb-2" placeholder="Verify Password" required>
+            <div id="p-msg" class="small fw-bold text-center mb-3" style="display:none;"></div>
+            <input type="file" id="img-in" name="profile_picture" class="form-control rounded-pill bg-light border-0 p-2 mb-4">
+            <button type="submit" id="modalSubmit" name="add_student" class="btn-pink w-100 shadow-lg">Register Identity</button>
+        </form>
+    </div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // --- 1. LIVE ENGINE (SEARCH, SORT, & PAGINATION) ---
+    let currentPage = 1;
+    const perPage = 5;
+    const searchInput = document.getElementById('master-smart-search');
+    const tableBody = document.getElementById('user-table-body');
+    const allRows = Array.from(tableBody.getElementsByClassName('user-row'));
+
+    function refreshTable() {
+        const term = searchInput.value.toLowerCase();
+        
+        // Filter Logic
+        let filtered = allRows.filter(row => row.innerText.toLowerCase().includes(term));
+        
+        // Priority Grouping (Males/Females first if searched)
+        if (term === 'male' || term === 'female') {
+            filtered.sort((a, b) => (a.dataset.gender === term ? -1 : 1) - (b.dataset.gender === term ? -1 : 1));
+        }
+
+        // Pagination Slicing
+        const totalPages = Math.ceil(filtered.length / perPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        
+        allRows.forEach(r => r.style.display = 'none');
+        const start = (currentPage - 1) * perPage;
+        const end = start + perPage;
+        filtered.slice(start, end).forEach(r => r.style.display = '');
+
+        // UI Update
+        document.getElementById('page-info').innerText = `SHOWING ${filtered.length > 0 ? start + 1 : 0} - ${Math.min(end, filtered.length)} OF ${filtered.length}`;
+        document.getElementById('prevBtn').disabled = currentPage === 1;
+        document.getElementById('nextBtn').disabled = currentPage === totalPages;
+    }
+
+    searchInput.oninput = () => { currentPage = 1; refreshTable(); };
+    document.getElementById('prevBtn').onclick = () => { currentPage--; refreshTable(); };
+    document.getElementById('nextBtn').onclick = () => { currentPage++; refreshTable(); };
+    refreshTable();
+
+    // --- 2. THEME & UTILITIES ---
+    const themeBtn = document.getElementById('themeBtn');
+    themeBtn.onclick = () => {
+        const next = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-bs-theme', next);
+        localStorage.setItem('theme', next);
+    };
+    if(localStorage.getItem('theme')) document.documentElement.setAttribute('data-bs-theme', localStorage.getItem('theme'));
+
+    // --- 3. PASSWORD VERIFICATION ---
+    const p1 = document.getElementById('pass1'), p2 = document.getElementById('pass2'), modalBtn = document.getElementById('modalSubmit'), pMsg = document.getElementById('p-msg');
+    
+    function validatePasswords() {
+        if (p2.value.length > 0) {
+            const match = p1.value === p2.value;
+            p2.classList.toggle('input-error', !match);
+            pMsg.style.display = "block"; pMsg.style.color = match ? "#2ecc71" : "#ff5e57";
+            pMsg.innerHTML = match ? '<i class="bi bi-shield-check"></i> Verified' : '<i class="bi bi-shield-exclamation"></i> Mismatch';
+            modalBtn.disabled = !match;
+        } else {
+            modalBtn.disabled = false;
+            pMsg.style.display = "none";
+            p2.classList.remove('input-error');
+        }
+    }
+    if(p1 && p2) { p1.onkeyup = validatePasswords; p2.onkeyup = validatePasswords; }
+
+    // --- 4. BULK ACTIONS & PREVIEW ---
+    const selectAll = document.getElementById('selectAll'), checkboxes = document.querySelectorAll('.user-checkbox'), bulkBtn = document.getElementById('bulkBtn');
+    if(selectAll) selectAll.onclick = () => { checkboxes.forEach(cb => cb.checked = selectAll.checked); bulkBtn.style.display = selectAll.checked ? "block" : "none"; };
+    checkboxes.forEach(cb => cb.onclick = () => { bulkBtn.style.display = Array.from(checkboxes).some(c => c.checked) ? "block" : "none"; });
+
+    document.getElementById('img-in').onchange = evt => {
+        const [file] = evt.target.files;
+        if (file) { document.getElementById('preview-img').src = URL.createObjectURL(file); document.getElementById('preview-img').style.display = "block"; }
+    };
+
+    // --- 5. FINALIZED SENTINEL NOTIFICATIONS (FIXED ENCODING) ---
+    function getThemeColors() {
+        return document.documentElement.getAttribute('data-bs-theme') === 'dark' 
+            ? { bg: '#1a2026', txt: '#fff' } 
+            : { bg: '#fff', txt: '#1e272e' };
+    }
+
+    {% if messages %}
+        {% for m in messages %}
+            Swal.fire({
+                title: 'Sentinel Update',
+                text: "{{ m|safe }}",
+                icon: "{% if m.tags == 'error' %}error{% else %}success{% endif %}",
+                background: getThemeColors().bg,
+                color: getThemeColors().txt,
+                confirmButtonColor: '#ff85a2',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                toast: true,
+                position: 'top-end'
+            });
+        {% endfor %}
+    {% endif %}
+
+    function confirmAction(url, title) {
+        Swal.fire({
+            title: title,
+            text: "Authorized personnel only. Proceed?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ff85a2',
+            cancelButtonColor: '#636e72',
+            confirmButtonText: 'Confirm',
+            background: getThemeColors().bg,
+            color: getThemeColors().txt
+        }).then((result) => { if (result.isConfirmed) window.location.href = url; });
+    }
+</script>
+</body>
+</html> 

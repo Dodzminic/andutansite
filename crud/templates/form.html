@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Identity | FILSYNC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        :root { --pink: #ff85a2; --bg: #fdf8f9; }
+        body { background-color: var(--bg); font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .glass-card { background: white; border-radius: 35px; box-shadow: 0 20px 50px rgba(255, 133, 162, 0.1); width: 100%; max-width: 550px; padding: 40px; border: 1px solid rgba(255,255,255,0.5); }
+        .p-img { width: 100px; height: 100px; border-radius: 30px; object-fit: cover; border: 4px solid white; box-shadow: 0 10px 20px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .btn-pink { background: linear-gradient(45deg, #ff85a2, #ff6b8d); color: white; border-radius: 50px; font-weight: 700; border: none; padding: 15px; transition: 0.3s; }
+        .btn-pink:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+        .section-label { font-size: 11px; font-weight: 800; color: var(--pink); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 15px; display: block; }
+        .input-error { border: 2px solid #ff85a2 !important; }
+    </style>
+</head>
+<body>
+    <div class="glass-card">
+        <div class="text-center">
+            {% if u.profile_picture %}
+                <img src="{{ u.profile_picture.url }}" class="p-img">
+            {% else %}
+                <div class="p-img d-inline-flex align-items-center justify-content-center bg-light fw-bold text-pink fs-1">{{ u.username|slice:":1"|upper }}</div>
+            {% endif %}
+            <h3 class="fw-800 mb-4">Edit Profile</h3>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <span class="section-label">General Information</span>
+            <div class="row mb-1">
+                <div class="col">
+                    <input type="text" name="username" value="{{ u.username }}" class="form-control rounded-pill border-0 bg-light p-3" placeholder="Full Name" required>
+                </div>
+                <div class="col">
+                    <input type="email" id="edit-email" name="email" value="{{ u.email }}" class="form-control rounded-pill border-0 bg-light p-3" placeholder="Email" required>
+                </div>
+            </div>
+            <div id="email-msg" class="small fw-bold mb-3 ms-3" style="display:none; font-size: 10px;"></div>
+
+            <div class="mb-4">
+                <select name="gender" class="form-select rounded-pill border-0 bg-light p-3 fw-bold">
+                    {% for g in genders %}
+                    <option value="{{ g.id }}" {% if u.gender.id == g.id %}selected{% endif %}>{{ g.gender }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <span class="section-label">Security (Leave blank to keep current)</span>
+            <div class="row mb-4">
+                <div class="col"><input type="password" id="p1" name="new_password" class="form-control rounded-pill border-0 bg-light p-3" placeholder="New Password"></div>
+                <div class="col"><input type="password" id="p2" name="confirm_password" class="form-control rounded-pill border-0 bg-light p-3" placeholder="Confirm New"></div>
+            </div>
+
+            <div class="mb-4">
+                <span class="section-label">Update Photo</span>
+                <input type="file" name="profile_picture" class="form-control rounded-pill border-0 bg-light p-2">
+            </div>
+
+            <button type="submit" id="sub" class="btn-pink w-100 mb-3 shadow">Save Intelligence Update</button>
+            <a href="{% url 'user_list' %}" class="btn btn-light w-100 rounded-pill fw-bold" style="color: #636e72;">Back to Hub</a>
+        </form>
+    </div>
+
+    <script>
+        const p1 = document.getElementById('p1'), 
+              p2 = document.getElementById('p2'), 
+              sub = document.getElementById('sub'),
+              emailInput = document.getElementById('edit-email'),
+              emailMsg = document.getElementById('email-msg');
+
+        const currentUserId = "{{ u.id }}";
+
+        // --- VALIDATE PASSWORDS ---
+        function validate() {
+            if (p1.value !== p2.value && p2.value.length > 0) {
+                p2.classList.add('input-error');
+                sub.disabled = true;
+            } else {
+                p2.classList.remove('input-error');
+                sub.disabled = false;
+            }
+        }
+        p1.onkeyup = validate;
+        p2.onkeyup = validate;
+
+        // --- VALIDATE EMAIL AVAILABILITY (LIVE) ---
+        emailInput.onkeyup = function() {
+            const email = this.value;
+
+            if (email.length > 5) {
+                // Talks to the URL we will create in Step 1 & 2
+                fetch(`/check-email/?email=${email}&user_id=${currentUserId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.is_taken) {
+                            emailInput.classList.add('input-error');
+                            emailMsg.style.display = "block";
+                            emailMsg.style.color = "#ff85a2";
+                            emailMsg.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> EMAIL ALREADY IN USE';
+                            sub.disabled = true;
+                        } else {
+                            emailInput.classList.remove('input-error');
+                            emailMsg.style.display = "block";
+                            emailMsg.style.color = "#2ecc71";
+                            emailMsg.innerHTML = '<i class="bi bi-check-circle-fill"></i> EMAIL AVAILABLE';
+                            sub.disabled = false;
+                            validate(); // Re-check passwords too
+                        }
+                    });
+            } else {
+                emailMsg.style.display = "none";
+            }
+        };
+    </script>
+</body>
+</html>
