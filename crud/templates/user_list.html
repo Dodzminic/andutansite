@@ -148,8 +148,13 @@
         <form id="addIdentityForm" action="{% url 'user_list' %}" method="POST" enctype="multipart/form-data"> {% csrf_token %}
             <h4 class="fw-800 mb-2 text-center text-dark">Register Identity</h4>
             <div class="text-center"><img id="preview-img" src="#" alt="Preview"></div>
-            <input type="text" name="username" class="form-control rounded-pill bg-light border-0 p-3 mb-3" placeholder="Full Name" required>
-            <input type="email" name="email" class="form-control rounded-pill bg-light border-0 p-3 mb-3" placeholder="Email" required>
+            
+            <input type="text" id="username_field" name="username" class="form-control rounded-pill bg-light border-0 p-3 mb-1" placeholder="Full Name" required>
+            <div id="u-msg" class="small fw-bold text-center mb-3" style="display:none; font-size: 10px;"></div>
+            
+            <input type="email" id="email_field" name="email" class="form-control rounded-pill bg-light border-0 p-3 mb-1" placeholder="Email" required>
+            <div id="e-msg" class="small fw-bold text-center mb-3" style="display:none; font-size: 10px;"></div>
+
             <select name="gender" class="form-select rounded-pill bg-light border-0 p-3 mb-3 fw-bold" required>
                 <option value="" disabled selected>Category</option>
                 {% for g in genders %}<option value="{{ g.id }}">{{ g.gender }}</option>{% endfor %}
@@ -174,25 +179,16 @@
 
     function refreshTable() {
         const term = searchInput.value.toLowerCase();
-        
-        // Filter Logic
         let filtered = allRows.filter(row => row.innerText.toLowerCase().includes(term));
-        
-        // Priority Grouping (Males/Females first if searched)
         if (term === 'male' || term === 'female') {
             filtered.sort((a, b) => (a.dataset.gender === term ? -1 : 1) - (b.dataset.gender === term ? -1 : 1));
         }
-
-        // Pagination Slicing
         const totalPages = Math.ceil(filtered.length / perPage) || 1;
         if (currentPage > totalPages) currentPage = totalPages;
-        
         allRows.forEach(r => r.style.display = 'none');
         const start = (currentPage - 1) * perPage;
         const end = start + perPage;
         filtered.slice(start, end).forEach(r => r.style.display = '');
-
-        // UI Update
         document.getElementById('page-info').innerText = `SHOWING ${filtered.length > 0 ? start + 1 : 0} - ${Math.min(end, filtered.length)} OF ${filtered.length}`;
         document.getElementById('prevBtn').disabled = currentPage === 1;
         document.getElementById('nextBtn').disabled = currentPage === totalPages;
@@ -212,8 +208,67 @@
     };
     if(localStorage.getItem('theme')) document.documentElement.setAttribute('data-bs-theme', localStorage.getItem('theme'));
 
-    // --- 3. PASSWORD VERIFICATION ---
-    const p1 = document.getElementById('pass1'), p2 = document.getElementById('pass2'), modalBtn = document.getElementById('modalSubmit'), pMsg = document.getElementById('p-msg');
+    // --- 3. LIVE VALIDATION ENGINE (USERNAME & EMAIL) ---
+    const usernameInput = document.getElementById('username_field');
+    const emailInput = document.getElementById('email_field');
+    const uMsg = document.getElementById('u-msg');
+    const eMsg = document.getElementById('e-msg');
+    const modalSubmit = document.getElementById('modalSubmit');
+
+    function checkFormValidity() {
+        const uError = usernameInput.classList.contains('input-error');
+        const eError = emailInput.classList.contains('input-error');
+        const p1 = document.getElementById('pass1').value;
+        const p2 = document.getElementById('pass2').value;
+        const pMatch = (p1 === p2 && p2.length > 0);
+        
+        modalSubmit.disabled = uError || eError || !pMatch;
+    }
+
+    usernameInput.onkeyup = function() {
+        let username = this.value;
+        if(username.length > 2) {
+            fetch(`/check-username/?username=${encodeURIComponent(username)}`)
+            .then(response => response.json())
+            .then(data => {
+                uMsg.style.display = "block";
+                if(data.is_taken) {
+                    uMsg.style.color = "#ff5e57";
+                    uMsg.innerHTML = '<i class="bi bi-x-circle"></i> Username taken';
+                    usernameInput.classList.add('input-error');
+                } else {
+                    uMsg.style.color = "#2ecc71";
+                    uMsg.innerHTML = '<i class="bi bi-check-circle"></i> Username available';
+                    usernameInput.classList.remove('input-error');
+                }
+                checkFormValidity();
+            });
+        }
+    };
+
+    emailInput.onkeyup = function() {
+        let email = this.value;
+        if(email.length > 5) {
+            fetch(`/check-email/?email=${encodeURIComponent(email)}`)
+            .then(response => response.json())
+            .then(data => {
+                eMsg.style.display = "block";
+                if(data.is_taken) {
+                    eMsg.style.color = "#ff5e57";
+                    eMsg.innerHTML = '<i class="bi bi-x-circle"></i> Email already registered';
+                    emailInput.classList.add('input-error');
+                } else {
+                    eMsg.style.color = "#2ecc71";
+                    eMsg.innerHTML = '<i class="bi bi-check-circle"></i> Email available';
+                    emailInput.classList.remove('input-error');
+                }
+                checkFormValidity();
+            });
+        }
+    };
+
+    // --- 4. PASSWORD VERIFICATION ---
+    const p1 = document.getElementById('pass1'), p2 = document.getElementById('pass2'), pMsg = document.getElementById('p-msg');
     
     function validatePasswords() {
         if (p2.value.length > 0) {
@@ -221,16 +276,15 @@
             p2.classList.toggle('input-error', !match);
             pMsg.style.display = "block"; pMsg.style.color = match ? "#2ecc71" : "#ff5e57";
             pMsg.innerHTML = match ? '<i class="bi bi-shield-check"></i> Verified' : '<i class="bi bi-shield-exclamation"></i> Mismatch';
-            modalBtn.disabled = !match;
         } else {
-            modalBtn.disabled = false;
             pMsg.style.display = "none";
             p2.classList.remove('input-error');
         }
+        checkFormValidity();
     }
     if(p1 && p2) { p1.onkeyup = validatePasswords; p2.onkeyup = validatePasswords; }
 
-    // --- 4. BULK ACTIONS & PREVIEW ---
+    // --- 5. BULK ACTIONS & PREVIEW ---
     const selectAll = document.getElementById('selectAll'), checkboxes = document.querySelectorAll('.user-checkbox'), bulkBtn = document.getElementById('bulkBtn');
     if(selectAll) selectAll.onclick = () => { checkboxes.forEach(cb => cb.checked = selectAll.checked); bulkBtn.style.display = selectAll.checked ? "block" : "none"; };
     checkboxes.forEach(cb => cb.onclick = () => { bulkBtn.style.display = Array.from(checkboxes).some(c => c.checked) ? "block" : "none"; });
@@ -240,7 +294,7 @@
         if (file) { document.getElementById('preview-img').src = URL.createObjectURL(file); document.getElementById('preview-img').style.display = "block"; }
     };
 
-    // --- 5. FINALIZED SENTINEL NOTIFICATIONS (FIXED ENCODING) ---
+    // --- 6. FINALIZED SENTINEL NOTIFICATIONS ---
     function getThemeColors() {
         return document.documentElement.getAttribute('data-bs-theme') === 'dark' 
             ? { bg: '#1a2026', txt: '#fff' } 
@@ -280,4 +334,4 @@
     }
 </script>
 </body>
-</html> 
+</html>

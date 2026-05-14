@@ -11,4 +11,8 @@ urlpatterns = [
     path('vault-action/', views.vault_action, name='vault_action'),
     path('export/', views.export_students, name='export_students'),
     path('check-email/', views.check_email_exists, name='check_email_exists'),
+    path('check-email/', views.check_email_exists, name='check_email'),
+    path('check-username/', views.check_username_exists, name='check_username'),
+    path('check-username/', views.check_username_exists, name='check_username'),
+    path('check-email/', views.check_email_exists, name='check_email'),
 ]

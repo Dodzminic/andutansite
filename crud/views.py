@@ -1,19 +1,10 @@
 import csv
 from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q, Case, When, Value, IntegerField
+from django.db import IntegrityError
 from django.contrib.auth.hashers import make_password
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
 from .models import UserProfile, Gender, ActionLog
-
-import csv
-from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q, Case, When, Value, IntegerField
-from django.contrib.auth.hashers import make_password
-from django.http import HttpResponse
-from django.contrib import messages
-from .models import UserProfile, Gender, ActionLog
-from django.http import JsonResponse
 
 def user_list(request):
     if request.method == "POST":
@@ -28,20 +19,36 @@ def user_list(request):
 
         # --- ADD IDENTITY ---
         if 'add_student' in request.POST:
+            username = request.POST.get('username')
+            email = request.POST.get('email')
+            
+            # SECURITY CHECK: Prevent duplicate username or email on creation
+            if UserProfile.objects.filter(username__iexact=username).exists():
+                messages.error(request, f"BREACH: Username '{username}' already exists.")
+                return redirect('user_list')
+            
+            if UserProfile.objects.filter(email__iexact=email).exists():
+                messages.error(request, f"BREACH: Email '{email}' is already in use.")
+                return redirect('user_list')
+
             password, confirm = request.POST.get('password'), request.POST.get('confirm_password')
             if password != confirm:
                 messages.error(request, "Security breach: Password mismatch detected.")
                 return redirect('user_list')
             
-            new_user = UserProfile.objects.create(
-                username=request.POST.get('username'),
-                email=request.POST.get('email'),
-                gender_id=request.POST.get('gender'),
-                password=make_password(password),
-                profile_picture=request.FILES.get('profile_picture')
-            )
-            ActionLog.objects.create(action=f"New Entity: {new_user.username}")
-            messages.success(request, f"Identity {new_user.username} successfully registered.")
+            try:
+                new_user = UserProfile.objects.create(
+                    username=username,
+                    email=email,
+                    gender_id=request.POST.get('gender'),
+                    password=make_password(password),
+                    profile_picture=request.FILES.get('profile_picture')
+                )
+                ActionLog.objects.create(action=f"New Entity: {new_user.username}")
+                messages.success(request, f"Identity {new_user.username} successfully registered.")
+            except IntegrityError:
+                messages.error(request, "CRITICAL: Database Integrity Error. Entry could not be saved.")
+            
             return redirect('user_list')
         
         # --- ADD GENDER ---
@@ -50,7 +57,6 @@ def user_list(request):
             if g_name:
                 Gender.objects.create(gender=g_name)
                 ActionLog.objects.create(action=f"New Category: {g_name}")
-                # We use simple quotes here to avoid encoding issues
                 messages.success(request, f"Category '{g_name}' has been activated.")
             return redirect('user_list')
 
@@ -67,39 +73,31 @@ def user_list(request):
         'f_count': users_all.filter(gender__gender__iexact='Female').count(),
     })
 
-# Rest of functions (edit_user, delete_user, archive_list, vault_action, export_students) remain the same
-
 def edit_user(request, pk):
-    # 1. Fetch the user we are currently editing
     user = get_object_or_404(UserProfile, pk=pk)
-    
     if request.method == "POST":
-        # 2. Get the new email they typed in the form
         new_email = request.POST.get('email')
+        new_username = request.POST.get('username')
         
-        # 3. THE FIX: Check if this email is already taken by someone else
-        # We look for the email, but EXCLUDE the current user's ID (pk)
         if UserProfile.objects.filter(email=new_email).exclude(pk=pk).exists():
-            # If it exists, send an error message and stay on the edit page
-            messages.error(request, f"ACCESS DENIED: Email '{new_email}' is already in use by another account.")
+            messages.error(request, f"ACCESS DENIED: Email '{new_email}' is already in use.")
+            return redirect('edit_user', pk=pk)
+
+        if UserProfile.objects.filter(username__iexact=new_username).exclude(pk=pk).exists():
+            messages.error(request, f"ACCESS DENIED: Username '{new_username}' already exists.")
             return redirect('edit_user', pk=pk)
         
-        # 4. If the check passes, update the fields
-        user.username = request.POST.get('username')
+        user.username = new_username
         user.email = new_email
         user.gender_id = request.POST.get('gender')
-        
         if request.FILES.get('profile_picture'):
             user.profile_picture = request.FILES.get('profile_picture')
             
-        # 5. Now it is safe to save! MySQL won't complain anymore.
         user.save()
         messages.success(request, "IDENTITY UPDATED: Credentials synchronized.")
         return redirect('user_list')
-        
     return render(request, 'form.html', {'u': user, 'genders': Gender.objects.all()})
-        
-    return render(request, 'form.html', {'u': user, 'genders': Gender.objects.all()})
+
 def edit_gender(request, pk):
     gender = get_object_or_404(Gender, pk=pk)
     if request.method == "POST":
@@ -140,11 +138,15 @@ def export_students(request):
         writer.writerow([u.username, u.email, u.gender.gender])
     return response
 
+# --- LIVE AJAX ENDPOINTS ---
 def check_email_exists(request):
     email = request.GET.get('email', None)
     current_user_id = request.GET.get('user_id', None)
-    
-    # We look for the email but ignore the user we are currently editing
     is_taken = UserProfile.objects.filter(email__iexact=email).exclude(id=current_user_id).exists()
-    
+    return JsonResponse({'is_taken': is_taken})
+
+def check_username_exists(request):
+    username = request.GET.get('username', None)
+    current_user_id = request.GET.get('user_id', None)
+    is_taken = UserProfile.objects.filter(username__iexact=username).exclude(id=current_user_id).exists()
     return JsonResponse({'is_taken': is_taken})

@@ -34,12 +34,15 @@
             <span class="section-label">General Information</span>
             <div class="row mb-1">
                 <div class="col">
-                    <input type="text" name="username" value="{{ u.username }}" class="form-control rounded-pill border-0 bg-light p-3" placeholder="Full Name" required>
+                    <!-- Added id="edit-username" to the username field -->
+                    <input type="text" id="edit-username" name="username" value="{{ u.username }}" class="form-control rounded-pill border-0 bg-light p-3" placeholder="Full Name" required>
                 </div>
                 <div class="col">
                     <input type="email" id="edit-email" name="email" value="{{ u.email }}" class="form-control rounded-pill border-0 bg-light p-3" placeholder="Email" required>
                 </div>
             </div>
+            <!-- Added username message display -->
+            <div id="username-msg" class="small fw-bold mb-2 ms-3" style="display:none; font-size: 10px;"></div>
             <div id="email-msg" class="small fw-bold mb-3 ms-3" style="display:none; font-size: 10px;"></div>
 
             <div class="mb-4">
@@ -71,46 +74,84 @@
               p2 = document.getElementById('p2'), 
               sub = document.getElementById('sub'),
               emailInput = document.getElementById('edit-email'),
-              emailMsg = document.getElementById('email-msg');
+              emailMsg = document.getElementById('email-msg'),
+              usernameInput = document.getElementById('edit-username'),
+              usernameMsg = document.getElementById('username-msg');
 
         const currentUserId = "{{ u.id }}";
 
-        // --- VALIDATE PASSWORDS ---
-        function validate() {
-            if (p1.value !== p2.value && p2.value.length > 0) {
-                p2.classList.add('input-error');
-                sub.disabled = true;
-            } else {
-                p2.classList.remove('input-error');
+        // Boolean trackers to ensure both are valid before enabling button
+        let emailValid = true;
+        let usernameValid = true;
+
+        function updateSubmitButton() {
+            // Check password match + uniqueness checks
+            const passwordsMatch = (p1.value === p2.value);
+            if (emailValid && usernameValid && passwordsMatch) {
                 sub.disabled = false;
+            } else {
+                sub.disabled = true;
             }
         }
-        p1.onkeyup = validate;
-        p2.onkeyup = validate;
+
+        // --- VALIDATE PASSWORDS ---
+        function validatePasswords() {
+            if (p1.value !== p2.value && p2.value.length > 0) {
+                p2.classList.add('input-error');
+            } else {
+                p2.classList.remove('input-error');
+            }
+            updateSubmitButton();
+        }
+        p1.onkeyup = validatePasswords;
+        p2.onkeyup = validatePasswords;
+
+        // --- VALIDATE USERNAME AVAILABILITY (LIVE) ---
+        usernameInput.onkeyup = function() {
+            const username = this.value;
+            if (username.length > 2) {
+                fetch(`/check-username/?username=${encodeURIComponent(username)}&user_id=${currentUserId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        usernameMsg.style.display = "block";
+                        if (data.is_taken) {
+                            usernameInput.classList.add('input-error');
+                            usernameMsg.style.color = "#ff85a2";
+                            usernameMsg.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> USERNAME ALREADY EXISTS';
+                            usernameValid = false;
+                        } else {
+                            usernameInput.classList.remove('input-error');
+                            usernameMsg.style.color = "#2ecc71";
+                            usernameMsg.innerHTML = '<i class="bi bi-check-circle-fill"></i> USERNAME AVAILABLE';
+                            usernameValid = true;
+                        }
+                        updateSubmitButton();
+                    });
+            } else {
+                usernameMsg.style.display = "none";
+            }
+        };
 
         // --- VALIDATE EMAIL AVAILABILITY (LIVE) ---
         emailInput.onkeyup = function() {
             const email = this.value;
-
             if (email.length > 5) {
-                // Talks to the URL we will create in Step 1 & 2
-                fetch(`/check-email/?email=${email}&user_id=${currentUserId}`)
+                fetch(`/check-email/?email=${encodeURIComponent(email)}&user_id=${currentUserId}`)
                     .then(response => response.json())
                     .then(data => {
+                        emailMsg.style.display = "block";
                         if (data.is_taken) {
                             emailInput.classList.add('input-error');
-                            emailMsg.style.display = "block";
                             emailMsg.style.color = "#ff85a2";
                             emailMsg.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> EMAIL ALREADY IN USE';
-                            sub.disabled = true;
+                            emailValid = false;
                         } else {
                             emailInput.classList.remove('input-error');
-                            emailMsg.style.display = "block";
                             emailMsg.style.color = "#2ecc71";
                             emailMsg.innerHTML = '<i class="bi bi-check-circle-fill"></i> EMAIL AVAILABLE';
-                            sub.disabled = false;
-                            validate(); // Re-check passwords too
+                            emailValid = true;
                         }
+                        updateSubmitButton();
                     });
             } else {
                 emailMsg.style.display = "none";
